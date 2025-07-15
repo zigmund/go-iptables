@@ -16,6 +16,7 @@ package iptables
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -834,29 +835,39 @@ func TestExtractIptablesVersion(t *testing.T) {
 }
 
 func TestListById(t *testing.T) {
+	type expected struct {
+		equal bool
+		err   error
+	}
 	testCases := []struct {
 		in       string
 		id       int
 		out      string
-		expected bool
+		expected expected
 	}{
 		{
 			"-i lo -p tcp -m tcp --dport 3000 -j DNAT --to-destination 127.0.0.1:3000",
 			1,
 			"-A PREROUTING -i lo -p tcp -m tcp --dport 3000 -j DNAT --to-destination 127.0.0.1:3000",
-			true,
+			expected{equal: true, err: nil},
 		},
 		{
 			"-i lo -p tcp -m tcp --dport 3000 -j DNAT --to-destination 127.0.0.1:3001",
 			2,
 			"-A PREROUTING -i lo -p tcp -m tcp --dport 3000 -j DNAT --to-destination 127.0.0.1:3001",
-			true,
+			expected{true, nil},
 		},
 		{
 			"-i lo -p tcp -m tcp --dport 3000 -j DNAT --to-destination 127.0.0.1:3002",
 			3,
 			"-A PREROUTING -i lo -p tcp -m tcp --dport 3000 -j DNAT --to-destination 127.0.0.1:3003",
-			false,
+			expected{false, nil},
+		},
+		{
+			"-i lo -p tcp -m tcp --dport 3000 -j DNAT --to-destination 127.0.0.1:3003",
+			100,
+			"-A PREROUTING -i lo -p tcp -m tcp --dport 3000 -j DNAT --to-destination 127.0.0.1:3003",
+			expected{false, ErrNotFound},
 		},
 	}
 
@@ -884,16 +895,16 @@ func TestListById(t *testing.T) {
 				t.Fatal(err)
 			}
 			rule, err := ipt.ListById("nat", "PREROUTING", tt.id)
-			if err != nil {
-				t.Fatal(err)
-			}
 			fmt.Println(rule)
 			test_result := false
 			if rule == tt.out {
 				test_result = true
 			}
-			if test_result != tt.expected {
+			if test_result != tt.expected.equal {
 				t.Fatal("Test failed")
+			}
+			if !errors.Is(err, tt.expected.err) {
+				t.Fatalf("Error expected: %v, got: %v", tt.expected.err, err)
 			}
 		})
 	}

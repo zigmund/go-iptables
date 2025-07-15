@@ -46,12 +46,16 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("running %v: exit status %v: %v", e.cmd.Args, e.ExitStatus(), e.msg)
 }
 
-var isNotExistPatterns = []string{
-	"Bad rule (does a matching rule exist in that chain?).\n",
-	"No chain/target/match by that name.\n",
-	"No such file or directory",
-	"does not exist",
-}
+var (
+	isNotExistPatterns = []string{
+		"Bad rule (does a matching rule exist in that chain?).\n",
+		"No chain/target/match by that name.\n",
+		"No such file or directory",
+		"does not exist",
+	}
+
+	ErrNotFound = errors.New("rule not found")
+)
 
 // IsNotExist returns true if the error is due to the chain or rule not existing
 func (e *Error) IsNotExist() bool {
@@ -287,6 +291,11 @@ func (ipt *IPTables) ListById(table, chain string, id int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	if len(rule) == 0 {
+		return "", ErrNotFound
+	}
+
 	return rule[0], nil
 }
 
